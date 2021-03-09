@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import * as ra from './lsp_ext';
 
 import { Ctx, Disposable } from './ctx';
-import { sendRequestWithRetry, isRustDocument, RustDocument, RustEditor, sleep } from './util';
+import { sendRequestWithRetry, isRustDocument, RustDocument, RustEditor, sleep, isRustEditor } from './util';
 
 
 export function activateInlayHints(ctx: Ctx) {
@@ -84,6 +84,12 @@ class HintsUpdater implements Disposable {
             this.disposables
         );
 
+        vscode.window.onDidChangeTextEditorSelection(
+            this.onDidChangeTextEditorSelection,
+            this,
+            this.disposables
+        )
+
         vscode.workspace.onDidChangeTextDocument(
             this.onDidChangeTextDocument,
             this,
@@ -112,6 +118,25 @@ class HintsUpdater implements Disposable {
     onDidChangeTextDocument({ contentChanges, document }: vscode.TextDocumentChangeEvent) {
         if (contentChanges.length === 0 || !isRustDocument(document)) return;
         this.syncCacheAndRenderHints();
+    }
+
+    onDidChangeTextEditorSelection({ textEditor: editor, selections }: vscode.TextEditorSelectionChangeEvent) {
+        if (!isRustEditor(editor) || selections.length == 0 || !this.ctx.config.inlayHints.disableOnSelection) return;
+
+        const file = this.sourceFiles.get(editor.document.uri.toString());
+        if (!file) return;
+
+        const decorations = file.cachedDecorations;
+        if (!decorations) return;
+
+        const map = (element: vscode.DecorationOptions) => {
+            const range = element.range;
+            return selections.find(it => it.isEmpty ? it.start.line == range.start.line : it.contains(range)) ? { range } : element;
+        }
+
+        editor.setDecorations(typeHints.decorationType, decorations.type.map(map));
+        editor.setDecorations(paramHints.decorationType, decorations.param.map(map));
+        editor.setDecorations(chainingHints.decorationType, decorations.chaining.map(map));
     }
 
     syncCacheAndRenderHints() {

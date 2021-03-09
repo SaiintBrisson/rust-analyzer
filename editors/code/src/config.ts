@@ -116,6 +116,7 @@ export class Config {
             parameterHints: this.get<boolean>("inlayHints.parameterHints"),
             chainingHints: this.get<boolean>("inlayHints.chainingHints"),
             maxLength: this.get<null | number>("inlayHints.maxLength"),
+            disableOnSelection: this.get<boolean>("inlayHints.disableOnSelection"),
         };
     }
 
